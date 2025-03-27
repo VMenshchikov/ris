@@ -1,0 +1,47 @@
+services:
+  manager:
+    build:
+      context: ./manager
+      dockerfile: ./Dockerfile
+    environment:
+      - WORKER_ADDRESSES=worker1:8082,worker2:8082,worker3:8082
+      - MAX_TASKS=4,4,4
+      - WORKER_IDS=1,2,3
+    ports:
+      - "8081:8081"
+    command: ["./app"]
+  worker1:
+    build:
+      context: ./worker
+      dockerfile: ./Dockerfile
+    environment:
+      - WORKER_ID=1
+      - MAXPROCS=4
+      - MANAGER_ADDRESS=manager:8081
+    ports:
+      - "8082:8082"
+    command: ["./app"]
+
+  worker2:
+    build:
+      context: ./worker
+      dockerfile: ./Dockerfile
+    environment:
+      - WORKER_ID=2
+      - MAXPROCS=4
+      - MANAGER_ADDRESS=manager:8081
+    ports:
+      - "8083:8082"
+    command: ["./app"]
+
+  worker3:
+    build:
+      context: ./worker
+      dockerfile: ./Dockerfile
+    environment:
+      - WORKER_ID=3
+      - MAXPROCS=4
+      - MANAGER_ADDRESS=manager:8081
+    ports:
+      - "8084:8082"
+    command: ["./app"]
