@@ -1,0 +1,176 @@
+services:
+  kafka-controller:
+      image: bitnami/kafka:3.6.1
+      container_name: kafka-controller
+      ports:
+        - "9093:9093"
+      environment:
+        - KAFKA_ENABLE_KRAFT=yes
+        - KAFKA_CFG_NODE_ID=2
+        - KAFKA_CFG_PROCESS_ROLES=controller
+        - KAFKA_CFG_LISTENERS=CONTROLLER://:9093
+        - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+        - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=2@kafka-controller:9093
+        - KAFKA_CFG_LOG_DIRS=/bitnami/kafka/data
+        - KAFKA_KRAFT_CLUSTER_ID=N_thPPiFT5Sh9BBCxGuOEA
+      volumes:
+        - kafka-controller-data:/bitnami/kafka
+
+  kafka-broker:
+    image: bitnami/kafka:3.6.1
+    container_name: kafka-broker
+    ports:
+      - "9092:9092"  # Порт, доступный снаружи (PLAINTEXT listener)
+    environment:
+      - KAFKA_ENABLE_KRAFT=yes                     # Включаем Kraft-режим (без ZooKeeper)
+      - KAFKA_CFG_NODE_ID=1                        # ID брокера
+      - KAFKA_KRAFT_CLUSTER_ID=N_thPPiFT5Sh9BBCxGuOEA  # Идентификатор кластера
+      - KAFKA_CFG_PROCESS_ROLES=broker             # Указываем роль: только брокер
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-broker:9092
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=2@kafka-controller:9093
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=false
+      - KAFKA_CFG_OFFSETS_RETENTION_MINUTES=10080
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_CFG_OFFSETS_TOPIC_NUM_PARTITIONS=1
+      - KAFKA_CFG_OFFSETS_TOPIC_SEGMENT_BYTES=104857600
+      - KAFKA_CFG_LOG_DIRS=/bitnami/kafka/data
+      - KAFKA_CFG_LOG_SEGMENT_BYTES=1073741824
+      - KAFKA_CFG_LOG_RETENTION_HOURS=168
+      - KAFKA_CFG_LOG_CLEANER_ENABLE=true
+      - KAFKA_CFG_LOG_CLEANER_THREADS=1
+      - KAFKA_CFG_LOG_CLEANUP_POLICY=delete
+      - KAFKA_CFG_GROUP_SESSION_TIMEOUT_MS=5000
+    volumes:
+      - kafka-broker-data:/bitnami/kafka
+      - ./scripts:/docker-entrypoint-initdb.d
+
+  mongo1:
+    image: mongo:latest
+    container_name: mongo1
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo1-data:/data/db
+    environment:
+      - MONGO_REPLICA_SET_NAME=rs0
+    command: ["--replSet", "rs0"]
+  
+  mongo2:
+    image: mongo:latest
+    container_name: mongo2
+    volumes:
+      - mongo2-data:/data/db
+    environment:
+      - MONGO_REPLICA_SET_NAME=rs0
+    command: ["--replSet", "rs0"]
+
+  mongo3:
+    image: mongo:latest
+    container_name: mongo3
+    volumes:
+      - mongo3-data:/data/db
+    environment:
+      - MONGO_REPLICA_SET_NAME=rs0
+    command: ["--replSet", "rs0"]
+
+  mongo-setup:
+    image: mongo:latest
+    container_name: mongo-setup
+    depends_on:
+      - mongo1
+      - mongo2
+      - mongo3
+    entrypoint: >
+      bash -c "
+        sleep 5;
+        echo 'Initiating replica set...';
+        mongosh --host mongo1 --eval '
+          rs.initiate({
+            _id: \"rs0\",
+            members: [
+              { _id: 0, host: \"mongo1:27017\" },
+              { _id: 1, host: \"mongo2:27017\" },
+              { _id: 2, host: \"mongo3:27017\" }
+            ]
+          })
+        ';
+      "
+
+  mongo-express:
+    image: mongo-express
+    container_name: mongo-express
+    ports:
+      - "8888:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongo1
+    depends_on:
+      - mongo1
+    
+  manager:
+    build:
+      context: ./manager
+      dockerfile: ./Dockerfile
+    environment:
+      - KAFKA_BROKER_URL=kafka-broker:9092
+      - KAFKA_TOPIC_MANAGER_TO_WORKERS=manager-to-workers
+      - KAFKA_TOPIC_WORKERS_TO_MANAGER=workers-to-manager
+      - MONGO_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0   
+      - IS_DEBUG=false
+    ports:
+      - "8081:8081"
+    command: ["./app"]
+
+  worker1:
+    container_name: worker1
+    build:
+      context: ./worker
+      dockerfile: ./Dockerfile
+    environment:
+      - WORKER_ID=1
+      - MAXPROCS=1
+      - KAFKA_BROKER_URL=kafka-broker:9092
+      - KAFKA_TOPIC_MANAGER_TO_WORKERS=manager-to-workers
+      - KAFKA_TOPIC_WORKERS_TO_MANAGER=workers-to-manager
+    ports:
+      - "8082:8082"
+    command: ["./app"]
+
+  worker2:
+    container_name: worker2
+    build:
+      context: ./worker
+      dockerfile: ./Dockerfile
+    environment:
+      - WORKER_ID=2
+      - MAXPROCS=1
+      - KAFKA_BROKER_URL=kafka-broker:9092
+      - KAFKA_TOPIC_MANAGER_TO_WORKERS=manager-to-workers
+      - KAFKA_TOPIC_WORKERS_TO_MANAGER=workers-to-manager
+    ports:
+      - "8083:8082"
+    command: ["./app"]
+
+  worker3:
+    container_name: worker3
+    build:
+      context: ./worker
+      dockerfile: ./Dockerfile
+    environment:
+      - WORKER_ID=3
+      - MAXPROCS=1
+      - KAFKA_BROKER_URL=kafka-broker:9092
+      - KAFKA_TOPIC_MANAGER_TO_WORKERS=manager-to-workers
+      - KAFKA_TOPIC_WORKERS_TO_MANAGER=workers-to-manager
+    ports:
+      - "8084:8082"
+    command: ["./app"]
+
+volumes:
+  kafka-broker-data:
+  kafka-controller-data: 
+  mongo1-data:
+  mongo2-data:
+  mongo3-data:
+ 
