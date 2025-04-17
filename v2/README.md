@@ -11,9 +11,13 @@ docker-compose up
 
 ## URL по умолчанию
 
-API доступен по адресу: `http://localhost:8081`
+API пользователя доступен по адресу: `http://localhost:8081`, API MognoExpress: `http://localhost:8888` 
 
 ## Эндпоинты
+
+### 0. MongoExpress
+
+*Логин и пароль по умолчанию не задан, управление через UI mongo express
 
 ### 1. Запрос на взлом хэша
 
