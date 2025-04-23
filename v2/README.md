@@ -38,7 +38,7 @@ API пользователя доступен по адресу: `http://localho
 **Ответ (JSON):**
 ```json
 {
-  "requestId": "123e4567-e89b-12d3-a456-426614174000"
+  "requestId": "34245"
 }
 ```
 
@@ -53,11 +53,11 @@ API пользователя доступен по адресу: `http://localho
 **Описание:** Возвращает статус выполнения задачи по взлому хэша.
 
 **Параметры запроса:**
-- `request_id` (UUID) - Идентификатор задачи
+- `request_id` (ID) - Идентификатор задачи
 
 **Пример запроса:**
 ```sh
-curl -X GET "http://localhost:8081/api/hash/status?request_id=123e4567-e89b-12d3-a456-426614174000"
+curl -X GET "http://localhost:8081/api/hash/status?request_id=123"
 ```
 
 
